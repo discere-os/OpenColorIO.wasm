@@ -1,0 +1,232 @@
+# OpenColorIO.wasm - Graphics Tier 3 CMake Configuration
+# Production-quality color management library compiled to WebAssembly
+# Following WASM Ecosystem Standards v2.0
+
+cmake_minimum_required(VERSION 3.16)
+project(OpenColorIO_WASM VERSION 2.5.0)
+
+# Verify we're using Emscripten
+if(NOT EMSCRIPTEN)
+    message(FATAL_ERROR "This build script requires Emscripten. Please use: emcmake cmake")
+endif()
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Build type configuration
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+endif()
+
+# Graphics Tier 3 memory configuration - High memory for rendering and LUTs
+set(WASM_INITIAL_MEMORY "128MB")
+set(WASM_MAXIMUM_MEMORY "2GB")
+
+# Build options for OpenColorIO.wasm
+option(ENABLE_SIMD "Enable WebAssembly SIMD optimizations" ON)
+option(ENABLE_WEBGPU "Enable WebGPU compute shader support" ON)
+option(ENABLE_WASM_NATIVE "Enable WASM-native filesystem features" ON)
+
+# Ecosystem dependency integration - Foundation Tier 1 libraries
+set(ECOSYSTEM_DEPS "")
+
+# Check for Foundation Tier 1 dependencies
+find_path(IMATH_WASM_DIR "imath.wasm" PATHS "../Imath.wasm/install" "../Imath.wasm/dist" NO_DEFAULT_PATH)
+if(IMATH_WASM_DIR)
+    list(APPEND ECOSYSTEM_DEPS "${IMATH_WASM_DIR}/imath.wasm")
+    message(STATUS "Using ecosystem Imath.wasm from ${IMATH_WASM_DIR}")
+else()
+    message(WARNING "Imath.wasm not found - OpenColorIO requires Foundation Tier 1 dependencies")
+endif()
+
+find_path(LIBEXPAT_WASM_DIR "libexpat.wasm" PATHS "../libexpat.wasm/install" "../libexpat.wasm/dist" NO_DEFAULT_PATH)
+if(LIBEXPAT_WASM_DIR)
+    list(APPEND ECOSYSTEM_DEPS "${LIBEXPAT_WASM_DIR}/libexpat.wasm")
+    message(STATUS "Using ecosystem libexpat.wasm from ${LIBEXPAT_WASM_DIR}")
+endif()
+
+find_path(ZLIB_WASM_DIR "zlib.wasm" PATHS "../zlib.wasm/install" "../zlib.wasm/dist" NO_DEFAULT_PATH)
+if(ZLIB_WASM_DIR)
+    list(APPEND ECOSYSTEM_DEPS "${ZLIB_WASM_DIR}/zlib.wasm")
+    message(STATUS "Using ecosystem zlib.wasm from ${ZLIB_WASM_DIR}")
+endif()
+
+find_path(MINIZIP_NG_WASM_DIR "minizip-ng.wasm" PATHS "../minizip-ng.wasm/install" "../minizip-ng.wasm/dist" NO_DEFAULT_PATH)
+if(MINIZIP_NG_WASM_DIR)
+    list(APPEND ECOSYSTEM_DEPS "${MINIZIP_NG_WASM_DIR}/minizip-ng.wasm")
+    message(STATUS "Using ecosystem minizip-ng.wasm from ${MINIZIP_NG_WASM_DIR}")
+endif()
+
+find_path(PYSTRING_WASM_DIR "pystring.wasm" PATHS "../pystring.wasm/install" "../pystring.wasm/dist" NO_DEFAULT_PATH)
+if(PYSTRING_WASM_DIR)
+    list(APPEND ECOSYSTEM_DEPS "${PYSTRING_WASM_DIR}/pystring.wasm")
+    message(STATUS "Using ecosystem pystring.wasm from ${PYSTRING_WASM_DIR}")
+endif()
+
+# Base compiler flags for Graphics Tier 3
+set(WASM_BASE_FLAGS
+    -sWASM=1
+    -sMODULARIZE=1
+    -sEXPORT_ES6=1
+    -sEXPORT_NAME='OpenColorIOModule'
+    -sINITIAL_MEMORY=${WASM_INITIAL_MEMORY}
+    -sMAXIMUM_MEMORY=${WASM_MAXIMUM_MEMORY}
+    -sALLOW_MEMORY_GROWTH=1
+    -sSTACK_SIZE=5MB
+    -sASSERTIONS=0
+)
+
+# Performance optimization flags
+set(WASM_OPTIMIZATION_FLAGS
+    -O3
+    -flto
+    --closure 1
+)
+
+# SIMD flags - Enable WebAssembly SIMD for color processing
+if(ENABLE_SIMD)
+    list(APPEND WASM_BASE_FLAGS -msimd128)
+    add_compile_definitions(OCIO_WASM_SIMD_ENABLED)
+    message(STATUS "✅ WebAssembly SIMD enabled for color transforms")
+else()
+    message(STATUS "❌ SIMD disabled - using scalar fallback")
+endif()
+
+# WebGPU support flags
+if(ENABLE_WEBGPU)
+    list(APPEND WASM_BASE_FLAGS
+        -sUSE_WEBGPU=1
+        -sASYNCIFY=1  # Required for async WebGPU operations
+    )
+    add_compile_definitions(OCIO_WASM_WEBGPU_ENABLED)
+    message(STATUS "✅ WebGPU compute shader support enabled")
+else()
+    message(STATUS "❌ WebGPU disabled")
+endif()
+
+# WASM-native filesystem support
+if(ENABLE_WASM_NATIVE)
+    list(APPEND WASM_BASE_FLAGS
+        -sFORCE_FILESYSTEM=1
+        -sASYNCIFY=1  # Required for async file operations
+        -lidbfs.js    # IDBFS for persistent color space storage
+        --preload-file configs@/color-configs
+    )
+    add_compile_definitions(OCIO_WASM_NATIVE_ENABLED)
+    message(STATUS "✅ WASM-native filesystem patterns enabled")
+else()
+    message(STATUS "❌ WASM-native features disabled")
+endif()
+
+# Runtime method exports
+set(WASM_RUNTIME_METHODS
+    ccall
+    cwrap
+    HEAPU8
+    HEAPF32
+    addFunction
+    removeFunction
+    FS
+)
+list(JOIN WASM_RUNTIME_METHODS "," RUNTIME_METHODS_STR)
+list(APPEND WASM_BASE_FLAGS -sEXPORTED_RUNTIME_METHODS=[${RUNTIME_METHODS_STR}])
+
+# Debug vs Release configuration
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    list(APPEND WASM_BASE_FLAGS
+        -g
+        -gsource-map
+        -sASSERTIONS=1
+        -sDEBUG_LEVEL=1
+    )
+    message(STATUS "🐛 Debug build with source maps enabled")
+else()
+    list(APPEND WASM_BASE_FLAGS ${WASM_OPTIMIZATION_FLAGS})
+    message(STATUS "🚀 Release build with full optimization")
+endif()
+
+# Apply flags to both compile and link
+string(JOIN " " WASM_FLAGS_STR ${WASM_BASE_FLAGS})
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WASM_FLAGS_STR}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WASM_FLAGS_STR}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${WASM_FLAGS_STR}")
+
+# Link ecosystem dependencies
+if(ECOSYSTEM_DEPS)
+    string(JOIN " " ECOSYSTEM_DEPS_STR ${ECOSYSTEM_DEPS})
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ECOSYSTEM_DEPS_STR}")
+    message(STATUS "🔗 Linking ecosystem dependencies: ${ECOSYSTEM_DEPS_STR}")
+endif()
+
+# Source files for OpenColorIO WASM module
+set(OCIO_WASM_SOURCES
+    wasm/ocio_wasm_main.cpp
+    wasm/ocio_wasm_api.cpp
+    wasm/ocio_wasm_simd.cpp
+    wasm/ocio_wasm_webgpu.cpp
+    wasm/ocio_wasm_native.cpp
+    wasm/ocio_js_bindings.cpp
+)
+
+# Create the WASM executable
+add_executable(opencolorio_wasm ${OCIO_WASM_SOURCES})
+
+# Set output names
+set_target_properties(opencolorio_wasm PROPERTIES
+    OUTPUT_NAME "opencolorio"
+)
+
+# Include directories for OpenColorIO headers
+target_include_directories(opencolorio_wasm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Link against system OpenColorIO (assumes already built)
+find_package(PkgConfig)
+if(PkgConfig_FOUND)
+    pkg_check_modules(OCIO REQUIRED OpenColorIO)
+    target_include_directories(opencolorio_wasm PRIVATE ${OCIO_INCLUDE_DIRS})
+    target_compile_options(opencolorio_wasm PRIVATE ${OCIO_CFLAGS_OTHER})
+    target_link_libraries(opencolorio_wasm ${OCIO_LIBRARIES})
+endif()
+
+# Compile definitions
+target_compile_definitions(opencolorio_wasm PRIVATE
+    OCIO_VERSION_MAJOR=2
+    OCIO_VERSION_MINOR=5
+    OCIO_VERSION_PATCH=0
+    OCIO_WASM_BUILD=1
+)
+
+# Installation
+install(FILES 
+    ${CMAKE_CURRENT_BINARY_DIR}/opencolorio.js
+    ${CMAKE_CURRENT_BINARY_DIR}/opencolorio.wasm
+    DESTINATION dist/
+)
+
+# Install TypeScript definitions
+install(FILES
+    wasm/opencolorio.d.ts
+    DESTINATION dist/
+)
+
+# Install additional assets
+if(ENABLE_WASM_NATIVE)
+    install(DIRECTORY configs/ DESTINATION dist/color-configs/)
+endif()
+
+# Print build summary
+message(STATUS "")
+message(STATUS "=== OpenColorIO.wasm Build Configuration ===")
+message(STATUS "Version: ${PROJECT_VERSION}")
+message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "SIMD: ${ENABLE_SIMD}")
+message(STATUS "WebGPU: ${ENABLE_WEBGPU}") 
+message(STATUS "WASM-native: ${ENABLE_WASM_NATIVE}")
+message(STATUS "Ecosystem deps: ${ECOSYSTEM_DEPS}")
+message(STATUS "Memory: ${WASM_INITIAL_MEMORY} - ${WASM_MAXIMUM_MEMORY}")
+message(STATUS "==========================================")
+message(STATUS "")

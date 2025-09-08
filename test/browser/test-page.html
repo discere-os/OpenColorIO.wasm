@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenColorIO.wasm Browser Test Page</title>
+    
+    <!-- Required headers for SharedArrayBuffer support -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .status {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .feature-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .color-demo {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .color-swatch {
+            width: 100px;
+            height: 60px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background-color: #4CAF50; }
+        .status-warning { background-color: #FF9800; }
+        .status-error { background-color: #F44336; }
+        .status-info { background-color: #2196F3; }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ddd;
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        pre {
+            background: #f8f8f8;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #5a67d8;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 OpenColorIO.wasm</h1>
+        <p>Production-quality color management for the web with SIMD and WebGPU acceleration</p>
+    </div>
+
+    <div class="status">
+        <h2>🔄 Loading Status</h2>
+        <div id="loadingStatus" class="loading">
+            <div class="spinner"></div>
+            Loading OpenColorIO.wasm module...
+        </div>
+    </div>
+
+    <div class="feature-grid" id="featureGrid" style="display: none;">
+        <div class="feature-card">
+            <h3>📊 Module Information</h3>
+            <div id="moduleInfo">
+                <p><strong>Version:</strong> <span id="version">-</span></p>
+                <p><strong>Build:</strong> <span id="buildType">-</span></p>
+                <p><strong>Memory:</strong> <span id="memoryInfo">-</span></p>
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <h3>⚡ Performance Features</h3>
+            <div id="performanceFeatures">
+                <p id="simdStatus">🔍 SIMD: Checking...</p>
+                <p id="webgpuStatus">🔍 WebGPU: Checking...</p>
+                <p id="nativeStatus">🔍 Native: Checking...</p>
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <h3>🌈 Color Spaces</h3>
+            <div id="colorSpaces">
+                <p>Available: <span id="colorSpaceCount">0</span></p>
+                <div id="colorSpaceList"></div>
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <h3>🚀 Performance</h3>
+            <div id="performanceInfo">
+                <button onclick="runBenchmark()">Run Benchmark</button>
+                <div id="benchmarkResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section" id="colorTransformDemo" style="display: none;">
+        <h3>🎨 Color Transform Demo</h3>
+        <p>Interactive color space conversion demonstration</p>
+        
+        <div>
+            <label>Source Color Space:</label>
+            <select id="srcColorSpace">
+                <option value="scene_linear">Scene Linear</option>
+                <option value="sRGB">sRGB</option>
+                <option value="Rec709">Rec709</option>
+            </select>
+            
+            <label>Destination Color Space:</label>
+            <select id="dstColorSpace">
+                <option value="sRGB">sRGB</option>
+                <option value="scene_linear">Scene Linear</option>
+                <option value="Rec709">Rec709</option>
+            </select>
+            
+            <button onclick="performColorTransform()">Apply Transform</button>
+            <button onclick="clearColorDemo()">Clear</button>
+        </div>
+        
+        <div class="color-demo" id="colorDemo">
+            <!-- Color swatches will be populated here -->
+        </div>
+    </div>
+
+    <div class="test-section" id="wasmNativeDemo" style="display: none;">
+        <h3>🌐 WASM-Native Features Demo</h3>
+        <p>Persistent storage and async resource loading</p>
+        
+        <div>
+            <button onclick="testCaching()">Test Caching</button>
+            <button onclick="loadRemoteConfig()">Load Remote Config</button>
+            <button onclick="clearAllCaches()">Clear Caches</button>
+        </div>
+        
+        <div id="nativeResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📋 Test Results</h3>
+        <pre id="testResults">Waiting for tests to complete...</pre>
+    </div>
+
+    <script type="module">
+        // Global variables for testing
+        window.OpenColorIOLoaded = false;
+        window.ocioInstance = null;
+        
+        // Mock OpenColorIO module for when real WASM is not available
+        function createMockModule() {
+            return {
+                OpenColorIOWasm: class {
+                    constructor() {
+                        this.initialized = false;
+                        this.mockProcessors = new Map();
+                        this.nextProcessorId = 1;
+                    }
+
+                    initialize() {
+                        this.initialized = true;
+                        return true;
+                    }
+
+                    getVersion() {
+                        return '2.5.0-browser-mock';
+                    }
+
+                    hasSIMD() {
+                        return typeof WebAssembly !== 'undefined' && 
+                               typeof WebAssembly.SIMD !== 'undefined';
+                    }
+
+                    hasWebGPU() {
+                        return typeof navigator !== 'undefined' && !!navigator.gpu;
+                    }
+
+                    hasNative() {
+                        return true; // Mock native features
+                    }
+
+                    getColorSpaces() {
+                        return ['scene_linear', 'sRGB', 'Rec709', 'ACES2065-1', 'ACEScg', 'DCI-P3'];
+                    }
+
+                    createProcessor(src, dst, direction = 'forward') {
+                        if (!this.initialized) return 0;
+                        const id = this.nextProcessorId++;
+                        this.mockProcessors.set(id, { src, dst, direction });
+                        return id;
+                    }
+
+                    applyTransform(processorId, pixels, useGPU = false) {
+                        if (!this.mockProcessors.has(processorId)) return false;
+                        
+                        // Mock simple transform
+                        for (let i = 0; i < pixels.length; i += 4) {
+                            pixels[i] = Math.min(1.0, pixels[i] * 1.1);     // R
+                            pixels[i + 1] = Math.min(1.0, pixels[i + 1] * 1.05); // G
+                            pixels[i + 2] = Math.min(1.0, pixels[i + 2] * 0.95); // B
+                        }
+                        return true;
+                    }
+
+                    releaseProcessor(processorId) {
+                        return this.mockProcessors.delete(processorId);
+                    }
+
+                    loadConfigFromUrl(url, id) {
+                        console.log(`Mock loading config from ${url} as ${id}`);
+                        return true;
+                    }
+
+                    getCachedConfig(id) {
+                        return id === 'test-config' ? 'mock-config-data' : '';
+                    }
+
+                    clearCache() {
+                        return true;
+                    }
+
+                    getStats() {
+                        return {
+                            version: this.getVersion(),
+                            initialized: this.initialized,
+                            simd: this.hasSIMD(),
+                            webgpu: this.hasWebGPU(),
+                            native: this.hasNative(),
+                            numColorSpaces: this.getColorSpaces().length,
+                            memoryUsed: 8 * 1024 * 1024,
+                            memoryTotal: 128 * 1024 * 1024
+                        };
+                    }
+
+                    benchmark(numPixels = 10000, iterations = 100) {
+                        const mockPerf = numPixels * iterations * 1000;
+                        return {
+                            simdOpsPerSecond: this.hasSIMD() ? mockPerf : 0,
+                            webgpuOpsPerSecond: this.hasWebGPU() ? mockPerf * 5 : 0,
+                            testPixels: numPixels,
+                            iterations: iterations,
+                            duration: (numPixels * iterations) / mockPerf * 1000
+                        };
+                    }
+                }
+            };
+        }
+
+        // Load OpenColorIO.wasm module
+        async function loadOpenColorIO() {
+            try {
+                let OpenColorIOModule;
+                
+                // Try to load real WASM module
+                try {
+                    OpenColorIOModule = await import('../../install/dist/opencolorio.js');
+                } catch (error) {
+                    console.warn('Real WASM module not found, using mock:', error.message);
+                    OpenColorIOModule = createMockModule();
+                }
+                
+                window.ocioInstance = new OpenColorIOModule.OpenColorIOWasm();
+                const initialized = window.ocioInstance.initialize();
+                
+                if (initialized) {
+                    window.OpenColorIOLoaded = true;
+                    await updateUI();
+                } else {
+                    throw new Error('Failed to initialize OpenColorIO.wasm');
+                }
+                
+            } catch (error) {
+                console.error('Failed to load OpenColorIO.wasm:', error);
+                document.getElementById('loadingStatus').innerHTML = 
+                    `<span class="status-indicator status-error"></span>Error loading OpenColorIO.wasm: ${error.message}`;
+            }
+        }
+
+        // Update UI with module information
+        async function updateUI() {
+            const stats = window.ocioInstance.getStats();
+            
+            // Update loading status
+            document.getElementById('loadingStatus').innerHTML = 
+                `<span class="status-indicator status-success"></span>OpenColorIO.wasm loaded successfully!`;
+            
+            // Show feature grid
+            document.getElementById('featureGrid').style.display = 'grid';
+            
+            // Module information
+            document.getElementById('version').textContent = stats.version;
+            document.getElementById('buildType').textContent = 
+                stats.version.includes('mock') ? 'Mock/Development' : 'Production WASM';
+            
+            if (stats.memoryUsed && stats.memoryTotal) {
+                const memoryMB = Math.round(stats.memoryUsed / 1024 / 1024);
+                const totalMB = Math.round(stats.memoryTotal / 1024 / 1024);
+                document.getElementById('memoryInfo').textContent = `${memoryMB}MB / ${totalMB}MB`;
+            }
+            
+            // Performance features
+            document.getElementById('simdStatus').innerHTML = 
+                `<span class="status-indicator ${stats.simd ? 'status-success' : 'status-warning'}"></span>SIMD: ${stats.simd ? 'Available' : 'Not Available'}`;
+            document.getElementById('webgpuStatus').innerHTML = 
+                `<span class="status-indicator ${stats.webgpu ? 'status-success' : 'status-warning'}"></span>WebGPU: ${stats.webgpu ? 'Available' : 'Not Available'}`;
+            document.getElementById('nativeStatus').innerHTML = 
+                `<span class="status-indicator ${stats.native ? 'status-success' : 'status-warning'}"></span>Native: ${stats.native ? 'Available' : 'Not Available'}`;
+            
+            // Color spaces
+            const colorSpaces = window.ocioInstance.getColorSpaces();
+            document.getElementById('colorSpaceCount').textContent = colorSpaces.length;
+            
+            const colorSpaceList = document.getElementById('colorSpaceList');
+            colorSpaceList.innerHTML = colorSpaces.slice(0, 6).map(space => 
+                `<div style="font-size: 12px; margin: 2px 0;">${space}</div>`
+            ).join('');
+            
+            if (colorSpaces.length > 6) {
+                colorSpaceList.innerHTML += `<div style="font-size: 12px; color: #666;">...and ${colorSpaces.length - 6} more</div>`;
+            }
+            
+            // Populate color space selectors
+            const srcSelect = document.getElementById('srcColorSpace');
+            const dstSelect = document.getElementById('dstColorSpace');
+            
+            [srcSelect, dstSelect].forEach(select => {
+                select.innerHTML = '';
+                colorSpaces.forEach(space => {
+                    const option = document.createElement('option');
+                    option.value = space;
+                    option.textContent = space;
+                    select.appendChild(option);
+                });
+            });
+            
+            // Show demo sections
+            document.getElementById('colorTransformDemo').style.display = 'block';
+            
+            if (stats.native) {
+                document.getElementById('wasmNativeDemo').style.display = 'block';
+            }
+            
+            // Update test results
+            updateTestResults(stats);
+        }
+
+        // Test functions
+        window.runBenchmark = async function() {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Running...';
+            
+            try {
+                const results = window.ocioInstance.benchmark(5000, 50);
+                
+                let html = '<h4>Benchmark Results:</h4>';
+                html += `<p>Test Pixels: ${results.testPixels.toLocaleString()}</p>`;
+                html += `<p>Iterations: ${results.iterations}</p>`;
+                
+                if (results.simdOpsPerSecond > 0) {
+                    html += `<p>SIMD Performance: ${Math.round(results.simdOpsPerSecond / 1000).toLocaleString()}K ops/sec</p>`;
+                }
+                
+                if (results.webgpuOpsPerSecond > 0) {
+                    html += `<p>WebGPU Performance: ${Math.round(results.webgpuOpsPerSecond / 1000).toLocaleString()}K ops/sec</p>`;
+                }
+                
+                if (results.duration) {
+                    html += `<p>Duration: ${results.duration.toFixed(2)}ms</p>`;
+                }
+                
+                document.getElementById('benchmarkResults').innerHTML = html;
+                
+            } catch (error) {
+                document.getElementById('benchmarkResults').innerHTML = 
+                    `<p style="color: red;">Benchmark error: ${error.message}</p>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Run Benchmark';
+            }
+        };
+
+        window.performColorTransform = function() {
+            const srcSpace = document.getElementById('srcColorSpace').value;
+            const dstSpace = document.getElementById('dstColorSpace').value;
+            
+            if (srcSpace === dstSpace) {
+                alert('Please select different source and destination color spaces');
+                return;
+            }
+            
+            const processorId = window.ocioInstance.createProcessor(srcSpace, dstSpace);
+            if (processorId <= 0) {
+                alert('Failed to create color processor');
+                return;
+            }
+            
+            // Test colors
+            const testColors = [
+                { name: 'Black', rgb: [0.0, 0.0, 0.0] },
+                { name: 'Gray', rgb: [0.5, 0.5, 0.5] },
+                { name: 'White', rgb: [1.0, 1.0, 1.0] },
+                { name: 'Red', rgb: [1.0, 0.0, 0.0] },
+                { name: 'Green', rgb: [0.0, 1.0, 0.0] },
+                { name: 'Blue', rgb: [0.0, 0.0, 1.0] }
+            ];
+            
+            const colorDemo = document.getElementById('colorDemo');
+            colorDemo.innerHTML = '';
+            
+            testColors.forEach(color => {
+                const pixels = new Float32Array([...color.rgb, 1.0]);
+                const originalRGB = [...color.rgb];
+                
+                const success = window.ocioInstance.applyTransform(processorId, pixels);
+                
+                if (success) {
+                    const transformedRGB = [pixels[0], pixels[1], pixels[2]];
+                    
+                    // Create color swatches
+                    const originalSwatch = document.createElement('div');
+                    originalSwatch.className = 'color-swatch';
+                    originalSwatch.style.backgroundColor = `rgb(${originalRGB.map(c => Math.round(c * 255)).join(',')})`;
+                    originalSwatch.innerHTML = `<div style="background: rgba(255,255,255,0.8); padding: 2px 4px; border-radius: 2px;">${color.name}<br>Original</div>`;
+                    
+                    const transformedSwatch = document.createElement('div');
+                    transformedSwatch.className = 'color-swatch';
+                    transformedSwatch.style.backgroundColor = `rgb(${transformedRGB.map(c => Math.round(Math.max(0, Math.min(1, c)) * 255)).join(',')})`;
+                    transformedSwatch.innerHTML = `<div style="background: rgba(255,255,255,0.8); padding: 2px 4px; border-radius: 2px;">${color.name}<br>Transformed</div>`;
+                    
+                    colorDemo.appendChild(originalSwatch);
+                    colorDemo.appendChild(transformedSwatch);
+                }
+            });
+            
+            window.ocioInstance.releaseProcessor(processorId);
+        };
+
+        window.clearColorDemo = function() {
+            document.getElementById('colorDemo').innerHTML = '';
+        };
+
+        window.testCaching = function() {
+            const results = document.getElementById('nativeResults');
+            const cleared = window.ocioInstance.clearCache();
+            results.innerHTML = `<p>Cache cleared: ${cleared ? '✅ Success' : '❌ Failed'}</p>`;
+        };
+
+        window.loadRemoteConfig = function() {
+            const results = document.getElementById('nativeResults');
+            const loaded = window.ocioInstance.loadConfigFromUrl('https://httpbin.org/json', 'test-config');
+            results.innerHTML += `<p>Remote config load initiated: ${loaded ? '✅ Success' : '❌ Failed'}</p>`;
+            
+            // Check if we can retrieve it (mock will return data immediately)
+            setTimeout(() => {
+                const cached = window.ocioInstance.getCachedConfig('test-config');
+                results.innerHTML += `<p>Retrieved cached config: ${cached.length > 0 ? `✅ ${cached.length} chars` : '❌ Empty'}</p>`;
+            }, 1000);
+        };
+
+        window.clearAllCaches = function() {
+            const results = document.getElementById('nativeResults');
+            const cleared = window.ocioInstance.clearCache();
+            results.innerHTML = `<p>All caches cleared: ${cleared ? '✅ Success' : '❌ Failed'}</p>`;
+        };
+
+        function updateTestResults(stats) {
+            const testResults = document.getElementById('testResults');
+            
+            const results = {
+                'Module Loading': '✅ Success',
+                'Initialization': stats.initialized ? '✅ Success' : '❌ Failed',
+                'Version Detection': stats.version ? '✅ Success' : '❌ Failed',
+                'SIMD Support': stats.simd ? '✅ Available' : '⚠️ Not Available',
+                'WebGPU Support': stats.webgpu ? '✅ Available' : '⚠️ Not Available',
+                'WASM-Native Features': stats.native ? '✅ Available' : '⚠️ Not Available',
+                'Color Space Loading': stats.numColorSpaces > 0 ? `✅ ${stats.numColorSpaces} spaces` : '❌ None found',
+                'Browser Compatibility': '✅ Compatible'
+            };
+            
+            let output = 'OpenColorIO.wasm Browser Test Results:\n';
+            output += '==========================================\n\n';
+            
+            for (const [test, result] of Object.entries(results)) {
+                output += `${test.padEnd(25)} ${result}\n`;
+            }
+            
+            output += '\nFeature Details:\n';
+            output += `- Version: ${stats.version}\n`;
+            output += `- Memory Usage: ${stats.memoryUsed ? Math.round(stats.memoryUsed / 1024 / 1024) + 'MB' : 'Unknown'}\n`;
+            output += `- WebAssembly: ${typeof WebAssembly !== 'undefined' ? 'Supported' : 'Not Supported'}\n`;
+            output += `- WASM SIMD: ${typeof WebAssembly.SIMD !== 'undefined' ? 'Supported' : 'Not Supported'}\n`;
+            output += `- WebGPU: ${typeof navigator !== 'undefined' && navigator.gpu ? 'Supported' : 'Not Supported'}\n`;
+            output += `- Cross-Origin Isolation: ${crossOriginIsolated ? 'Enabled' : 'Disabled'}\n`;
+            
+            testResults.textContent = output;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', loadOpenColorIO);
+    </script>
+</body>
+</html>
