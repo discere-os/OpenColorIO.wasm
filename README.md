@@ -1,16 +1,18 @@
+# @discere-os/opencolorio.wasm
+
+WebAssembly port of OpenColorIO - A complete color management solution geared towards motion picture production with emphasis on visual effects and computer animation.
+
+[![CI/CD](https://github.com/discere-os/discere-nucleus/actions/workflows/opencolorio-wasm-ci.yml/badge.svg)](https://github.com/discere-os/discere-nucleus/actions)
+[![JSR](https://jsr.io/badges/@discere-os/opencolorio.wasm)](https://jsr.io/@discere-os/opencolorio.wasm)
+[![npm version](https://badge.fury.io/js/@discere-os%2Fopencolorio.wasm.svg)](https://badge.fury.io/js/@discere-os%2Fopencolorio.wasm)
+[![License](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/discere-os/discere-nucleus)
+
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 <!-- Copyright Contributors to the OpenColorIO Project. -->
 
 OpenColorIO
 ===========
-
-[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![CI Status](https://github.com/AcademySoftwareFoundation/OpenColorIO/workflows/CI/badge.svg)](https://github.com/AcademySoftwareFoundation/OpenColorIO/actions?query=workflow%3ACI)
-[![GPU CI Status](https://github.com/AcademySoftwareFoundation/OpenColorIO/workflows/GPU/badge.svg)](https://github.com/AcademySoftwareFoundation/OpenColorIO/actions?query=workflow%3AGPU)
-[![Analysis Status](https://github.com/AcademySoftwareFoundation/OpenColorIO/workflows/Analysis/badge.svg)](https://github.com/AcademySoftwareFoundation/OpenColorIO/actions?query=workflow%3AAnalysis)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=AcademySoftwareFoundation_OpenColorIO&metric=alert_status)](https://sonarcloud.io/dashboard?id=AcademySoftwareFoundation_OpenColorIO)
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2612/badge)](https://bestpractices.coreinfrastructure.org/projects/2612)
-[![Wheels](https://github.com/AcademySoftwareFoundation/OpenColorIO/workflows/Wheel/badge.svg)](https://github.com/AcademySoftwareFoundation/OpenColorIO/actions?query=workflow%3AWheel)
 
 Introduction
 ------------
